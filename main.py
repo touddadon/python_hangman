@@ -1,46 +1,58 @@
-from random import randint
-from time import sleep
-from re import search
 from json import load
+from random import randint
+from re import search
+from time import sleep
+from typing import Tuple
 
-def print_and_clear(output='', clear_screen=True, sleep_time=1):
+
+def print_and_clear(
+    output: str = "", clear_screen: bool = True, sleep_time: int = 1
+) -> None:
     if output is not None:
         print(output)
         sleep(sleep_time)
-        print("\033[F\r\033[K", end='') # подвинуть каретку на строку выше и очистить строку
+        # очистить строку выше
+        print("\033[F\r\033[K", end="")
     if clear_screen is True:
-        print("\033[H\033[J", end='') # подвинуть каретку в левый верхний угол и очистить зону от каретки до конца экрана 
-    return
+        # очистить экран
+        print("\033[H\033[J", end="")
 
-def check_hangman_input(input, used_letters):
-    if len(input) > 1 or bool(search("[а-яА-Я]", input)) is False:
+
+def check_hangman_entry(entry: str, used_letters: list[str]) -> bool:
+    if len(entry) > 1 or bool(search("[а-яА-Я]", entry)) is False:
         print_and_clear("Неправильный ввод.")
         return False
-    elif input in used_letters:
+    if entry in used_letters:
         print_and_clear("Вы уже использовали эту букву.")
         return False
     return True
 
-def announce_result(win, true_word):
+
+def announce_result(win: bool, true_word: str) -> None:
     if win is False:
         print_and_clear(f"\nВы проиграли! Правильное слово: {true_word}", sleep_time=2)
     else:
         print_and_clear(f"\nВы победили! Правильное слово: {true_word}", sleep_time=2)
-    return
 
-def check_game_over(mistakes_count, true_word, hidden_word):
-    player_won = (true_word == ''.join(hidden_word))
+
+def check_game_over(
+    mistakes_count: int, true_word: str, hidden_word: list[str]
+) -> bool:
+    player_won: bool = true_word == "".join(hidden_word)
     if mistakes_count == 6:
         announce_result(win=False, true_word=true_word)
         return True
-    elif player_won is True:
+    if player_won is True:
         announce_result(win=True, true_word=true_word)
         return True
     return False
 
-def player_turn(true_word, letter, mistakes_count, hidden_word, used_letters):
-    letter = input()
-    if check_hangman_input(letter, used_letters):
+
+def player_turn(
+    true_word: str, mistakes_count: int, hidden_word: list[str], used_letters: list[str]
+) -> Tuple[str, int]:
+    letter: str = input()
+    if check_hangman_entry(letter, used_letters):
         used_letters.append(letter)
         if letter in true_word:
             for i in range(len(hidden_word)):
@@ -50,42 +62,57 @@ def player_turn(true_word, letter, mistakes_count, hidden_word, used_letters):
             mistakes_count += 1
             print_and_clear("Такой буквы нет в загаданном слове.", clear_screen=False)
         print_and_clear()
-
     return letter, mistakes_count
 
-def hangman(true_word, letter, mistakes_count, hidden_word, used_letters, hangman_stages):
-    GAME_IN_PROGRESS = True
-    while (GAME_IN_PROGRESS):
-        print('\n'.join(hangman_stages[mistakes_count]))
-        print(''.join(hidden_word))
-        print(f"Всего ошибок: {mistakes_count}. Последний ввод: {letter}. Введите букву русского алфавита: ", end='')
+
+def game_cycle(
+    true_word: str,
+    mistakes_count: int,
+    hidden_word: list[str],
+    used_letters: list[str],
+    hangman_stages: list[list[str]],
+) -> None:
+    game_in_progress: bool = True
+    letter: str = "-"
+    while game_in_progress:
+        print("\n".join(hangman_stages[mistakes_count]))
+        print("".join(hidden_word))
+        print(f"Всего ошибок: {mistakes_count}. Последний ввод: {letter}.")
+        print("Введите букву русского алфавита: ", end="")
 
         if check_game_over(mistakes_count, true_word, hidden_word):
-            GAME_IN_PROGRESS = False
+            game_in_progress = False
         else:
-            letter, mistakes_count = player_turn(true_word, letter, mistakes_count, hidden_word, used_letters)
+            letter, mistakes_count = player_turn(
+                true_word, mistakes_count, hidden_word, used_letters
+            )
 
-def init_newgame_or_exit(words, hangman_stages):
+
+def init_newgame_or_exit(words: list[str], hangman_stages: list[list[str]]) -> None:
     while True:
-        choice = input("Начать новую игру или выйти? (newgame/exit) ")
+        choice: str = input("Начать новую игру или выйти? (newgame/exit) ")
         if choice == "newgame":
-            true_word = words[randint(0, len(words)-1)]
-            letter = '-'
-            mistakes_count = 0
-            hidden_word = ['_']*len(true_word)
-            used_letters = []
-            hangman(true_word, letter, mistakes_count, hidden_word, used_letters, hangman_stages)
+            true_word: str = words[randint(0, len(words) - 1)]
+            mistakes_count: int = 0
+            hidden_word: list[str] = ["_"] * len(true_word)
+            used_letters: list[str] = []
+            game_cycle(
+                true_word, mistakes_count, hidden_word, used_letters, hangman_stages
+            )
         elif choice == "exit":
             return
         else:
-            print_and_clear("Неправильный ввод.")        
+            print_and_clear("Неправильный ввод.")
+
 
 if __name__ == "__main__":
-    with open('words.txt', 'r', encoding='utf-8') as f:
-        words = [line.strip().lower() for line in f if line.strip().isalpha()]
-    with open('hangman_stages.json', 'r', encoding='utf-8') as f:
-        hangman_stages = load(f)
-    if not words or not hangman_stages:
+    with open("words.txt", "r", encoding="utf-8") as f:
+        words_file: list[str] = [
+            line.strip().lower() for line in f if line.strip().isalpha()
+        ]
+    with open("hangman_stages.json", "r", encoding="utf-8") as f:
+        hangman_stages_file: list[list[str]] = load(f)
+    if not words_file or not hangman_stages_file:
         print("words.txt или hangman_stages.json пуст.")
     else:
-        init_newgame_or_exit(words, hangman_stages)
+        init_newgame_or_exit(words_file, hangman_stages_file)
