@@ -19,7 +19,7 @@ def print_and_clear(
 
 
 def check_hangman_entry(entry: str, used_letters: list[str]) -> bool:
-    if len(entry) > 1 or bool(search("[а-яА-Я]", entry)) is False:
+    if len(entry) > 1 or bool(search("[а-яА-ЯёЁ]", entry)) is False:
         print_and_clear("Неправильный ввод.")
         return False
     if entry in used_letters:
