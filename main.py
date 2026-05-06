@@ -36,10 +36,10 @@ def announce_result(win: bool, true_word: str) -> None:
 
 
 def check_game_over(
-    mistakes_count: int, true_word: str, hidden_word: list[str]
+    mistakes_count: int, true_word: str, hidden_word: list[str], max_mistakes: int
 ) -> bool:
     player_won: bool = true_word == "".join(hidden_word)
-    if mistakes_count == 6:
+    if mistakes_count == max_mistakes:
         announce_result(win=False, true_word=true_word)
         return True
     if player_won is True:
@@ -88,7 +88,12 @@ def game_cycle(
     letter: str = "-"
     while game_in_progress:
         print_game_screen(hangman_stages, mistakes_count, hidden_word, letter)
-        if check_game_over(mistakes_count, true_word, hidden_word):
+        if check_game_over(
+            mistakes_count,
+            true_word,
+            hidden_word,
+            max_mistakes=(len(hangman_stages) - 1),
+        ):
             game_in_progress = False
         else:
             letter, mistakes_count = player_turn(
