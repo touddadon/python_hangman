@@ -1,133 +1,173 @@
-from json import load
+from json import JSONDecodeError, load
 from random import choice
 from re import search
-from time import sleep
-from typing import Tuple
 
 
-def print_and_clear(
-    output: str, clear_screen: bool = True, sleep_time: int = 1
-) -> None:
-    if output is not None:
-        print(output)
-        sleep(sleep_time)
-        # очистить строку выше
-        print("\033[F\r\033[K", end="")
-    if clear_screen is True:
-        # очистить экран
-        print("\033[H\033[J", end="")
+def clear_screen() -> None:
+    input("Введите любой текст, чтобы продолжить")
+    ansi_clear_screen_literal: str = "\033[H\033[J"
+    print(ansi_clear_screen_literal, end="")
 
 
-def check_hangman_entry(entry: str, used_letters: list[str]) -> bool:
-    if len(entry) > 1 or bool(search("[а-яА-ЯёЁ]", entry)) is False:
-        print_and_clear("Неправильный ввод.")
-        return False
-    if entry in used_letters:
-        print_and_clear("Вы уже использовали эту букву.")
+def is_entry_wrong_format(entry: str) -> bool:
+    return len(entry) > 1 or bool(search("[а-яА-ЯёЁ]", entry)) is False
+
+
+def is_entry_used_before(entry: str, used_letters: list[str]) -> bool:
+    return entry in used_letters
+
+
+def print_entry_validation(entry: str, used_letters: list[str]) -> None:
+    if is_entry_used_before(entry, used_letters):
+        print("Вы уже использовали эту букву.")
+    elif is_entry_wrong_format(entry):
+        print("Неправильный ввод.")
+    else:
+        print("Такой буквы нет в загаданном слове.")
+
+
+def unmask_word(hidden_word: list[str], true_word: str, entry: str) -> None:
+    for i in range(len(hidden_word)):
+        if entry == true_word[i]:
+            hidden_word[i] = entry
+
+
+def process_valid_entry(
+    entry: str, true_word: str, hidden_word: list[str], mistakes_count: int
+) -> int:
+    if entry in true_word:
+        unmask_word(hidden_word, true_word, entry)
+    else:
+        mistakes_count += 1
+    return mistakes_count
+
+
+def is_hangman_entry_valid(entry: str, used_letters: list[str]) -> bool:
+    if is_entry_wrong_format(entry) or is_entry_used_before(entry, used_letters):
         return False
     return True
 
 
-def announce_result(win: bool, true_word: str) -> None:
-    if win is False:
-        print_and_clear(f"\nВы проиграли! Правильное слово: {true_word}", sleep_time=2)
-    else:
-        print_and_clear(f"\nВы победили! Правильное слово: {true_word}", sleep_time=2)
-
-
-def check_game_over(
-    mistakes_count: int, true_word: str, hidden_word: list[str], max_mistakes: int
-) -> bool:
-    player_won: bool = true_word == "".join(hidden_word)
-    if mistakes_count == max_mistakes:
-        announce_result(win=False, true_word=true_word)
-        return True
-    if player_won is True:
-        announce_result(win=True, true_word=true_word)
-        return True
-    return False
-
-
 def player_turn(
     true_word: str, mistakes_count: int, hidden_word: list[str], used_letters: list[str]
-) -> Tuple[str, int]:
-    letter: str = input().strip().lower()
-    if check_hangman_entry(letter, used_letters):
-        used_letters.append(letter)
-        if letter in true_word:
-            for i in range(len(hidden_word)):
-                if letter == true_word[i]:
-                    hidden_word[i] = letter
-        else:
-            mistakes_count += 1
-            print_and_clear("Такой буквы нет в загаданном слове.", clear_screen=False)
-        print_and_clear("")
-    return letter, mistakes_count
+) -> int:
+    entry: str = input().strip().lower()
+    if is_hangman_entry_valid(entry, used_letters):
+        used_letters.append(entry)
+        mistakes_count = process_valid_entry(
+            entry, true_word, hidden_word, mistakes_count
+        )
+    else:
+        print_entry_validation(entry, used_letters)
+    clear_screen()
+    return mistakes_count
 
 
 def print_game_screen(
     hangman_stages: list[list[str]],
     mistakes_count: int,
     hidden_word: list[str],
-    letter: str,
+    used_letters: list[str],
 ):
+    tries_left = len(hangman_stages) - mistakes_count - 1
+
     print("\n".join(hangman_stages[mistakes_count]))
     print("".join(hidden_word))
-    print(f"Всего ошибок: {mistakes_count}. Последний ввод: {letter}.")
+    print(f"Осталось попыток: {tries_left}.")
+    if len(used_letters) > 0:
+        print(f"Использованные буквы: {", ".join(used_letters)}.")
     print("Введите букву русского алфавита: ", end="")
+
+
+def announce_result(win: bool, true_word: str) -> None:
+    if win is False:
+        print(f"\nВы проиграли! Правильное слово: {true_word}")
+    else:
+        print(f"\nВы победили! Правильное слово: {true_word}")
+    clear_screen()
+
+
+def has_player_lost(mistakes_count: int, max_mistakes: int) -> bool:
+    return mistakes_count == max_mistakes
+
+
+def has_player_won(true_word: str, hidden_word: list[str]) -> bool:
+    return true_word == "".join(hidden_word)
+
+
+def is_game_over(
+    mistakes_count: int, true_word: str, hidden_word: list[str], max_mistakes: int
+) -> bool:
+    if has_player_lost(mistakes_count, max_mistakes) or has_player_won(
+        true_word, hidden_word
+    ):
+        return True
+    return False
 
 
 def game_cycle(
     true_word: str,
-    mistakes_count: int,
-    hidden_word: list[str],
-    used_letters: list[str],
     hangman_stages: list[list[str]],
 ) -> None:
-    game_in_progress: bool = True
-    letter: str = "-"
+    mistakes_count: int = 0
+    hidden_word: list[str] = ["_"] * len(true_word)
+    used_letters: list[str] = []
+    max_mistakes = len(hangman_stages) - 1
+    game_in_progress: bool = not (
+        is_game_over(mistakes_count, true_word, hidden_word, max_mistakes)
+    )
+
     while game_in_progress:
-        print_game_screen(hangman_stages, mistakes_count, hidden_word, letter)
-        if check_game_over(
-            mistakes_count,
-            true_word,
-            hidden_word,
-            max_mistakes=(len(hangman_stages) - 1),
-        ):
-            game_in_progress = False
-        else:
-            letter, mistakes_count = player_turn(
-                true_word, mistakes_count, hidden_word, used_letters
-            )
+        print_game_screen(hangman_stages, mistakes_count, hidden_word, used_letters)
+        mistakes_count = player_turn(
+            true_word, mistakes_count, hidden_word, used_letters
+        )
+        game_in_progress = not (
+            is_game_over(mistakes_count, true_word, hidden_word, max_mistakes)
+        )
+
+    if has_player_lost(mistakes_count, max_mistakes):
+        announce_result(win=False, true_word=true_word)
+    elif has_player_won(true_word, hidden_word):
+        announce_result(win=True, true_word=true_word)
 
 
-def init_newgame_or_exit(words: list[str], hangman_stages: list[list[str]]) -> None:
+def game_menu(words: list[str], hangman_stages: list[list[str]]) -> None:
     while True:
-        player_entry: str = input("Начать новую игру или выйти? (newgame/exit) ")
-        if player_entry == "newgame":
+        player_entry: str = input("Начать новую игру или выйти? (начать/выйти) ")
+        if player_entry == "начать":
             true_word: str = choice(words)
-            mistakes_count: int = 0
-            hidden_word: list[str] = ["_"] * len(true_word)
-            used_letters: list[str] = []
-            game_cycle(
-                true_word, mistakes_count, hidden_word, used_letters, hangman_stages
-            )
-        elif player_entry == "exit":
+            game_cycle(true_word, hangman_stages)
+        elif player_entry == "выйти":
             return
         else:
-            print_and_clear("Неправильный ввод.")
+            print("Неправильный ввод.")
+            clear_screen()
 
 
-if __name__ == "__main__":
-    with open("words.txt", "r", encoding="utf-8") as f:
+def get_words(filepath: str) -> list[str]:
+    with open(filepath, "r", encoding="utf-8") as f:
         words_file: list[str] = [
             line.strip().lower() for line in f if line.strip().isalpha()
         ]
+    if not (words_file):
+        raise ValueError(f"{filepath} пуст.")
+    return words_file
 
-    with open("hangman_stages.json", "r", encoding="utf-8") as f:
-        hangman_stages_file: list[list[str]] = load(f)
 
-    if not words_file or not hangman_stages_file:
-        print("words.txt или hangman_stages.json пуст.")
-    else:
-        init_newgame_or_exit(words_file, hangman_stages_file)
+def get_hangman_stages(filepath: str) -> list[list[str]]:
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            hangman_stages_file: list[list[str]] = load(f)
+            return hangman_stages_file
+    except JSONDecodeError:
+        raise Exception(f"{filepath} пуст или невалидный JSON.")
+
+
+if __name__ == "__main__":
+    try:
+        words_file: list[str] = get_words("words.txt")
+        hangman_stages: list[list[str]] = get_hangman_stages("hangman_stages.json")
+        game_menu(words_file, hangman_stages)
+    except Exception as e:
+        print(e)
